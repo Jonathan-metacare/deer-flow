@@ -30,7 +30,7 @@ class State(MessagesState):
 
     # Clarification state tracking (disabled by default)
     enable_clarification: bool = (
-        False  # Enable/disable clarification feature (default: False)
+        True  # Enable/disable clarification feature (default: True)
     )
     clarification_rounds: int = 0
     clarification_history: list[str] = field(default_factory=list)

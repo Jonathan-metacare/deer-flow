@@ -304,10 +304,8 @@ def planner_node(
 
     if configurable.enable_deep_thinking:
         llm = get_llm_by_type("reasoning")
-    elif AGENT_LLM_MAP["planner"] == "basic":
-        llm = get_llm_by_type("basic")
     else:
-        llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
+        llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
 
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
@@ -331,7 +329,8 @@ def planner_node(
     logger.info(f"Planner response: {full_response}")
 
     # Validate explicitly that response content is valid JSON before proceeding to parse it
-    if not full_response.strip().startswith('{') and not full_response.strip().startswith('['):
+    repaired_response = repair_json_output(full_response)
+    if not (repaired_response.strip().startswith('{') or repaired_response.strip().startswith('[')):
         logger.warning("Planner response does not appear to be valid JSON")
         if plan_iterations > 0:
             return Command(
@@ -345,13 +344,12 @@ def planner_node(
             )
 
     try:
-        curr_plan = json.loads(repair_json_output(full_response))
-        # Need to extract the plan from the full_response
-        curr_plan_content = extract_plan_content(curr_plan)
-        # load the current_plan
-        curr_plan = json.loads(repair_json_output(curr_plan_content))
-    except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+        curr_plan = json.loads(repaired_response)
+        # If it's a list, it might be the steps directly, but Plan expects a dict
+        if isinstance(curr_plan, list):
+            curr_plan = {"steps": curr_plan, "has_enough_context": False, "title": "Research Plan", "locale": state.get("locale", "en-US")}
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("Failed to parse repaired planner response as JSON")
         if plan_iterations > 0:
             return Command(
                 update=preserve_state_meta_fields(state),

@@ -72,12 +72,12 @@ class ChatRequest(BaseModel):
         False, description="Whether to enable deep thinking"
     )
     enable_clarification: Optional[bool] = Field(
-        None,
-        description="Whether to enable multi-turn clarification (default: None, uses State default=False)",
+        True,
+        description="Whether to enable multi-turn clarification (default: True, uses State default=True)",
     )
     max_clarification_rounds: Optional[int] = Field(
-        None,
-        description="Maximum number of clarification rounds (default: None, uses State default=3)",
+        3,
+        description="Maximum number of clarification rounds (default: 3, uses State default=3)",
     )
     interrupt_before_tools: List[str] = Field(
         default_factory=list,
