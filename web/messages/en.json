@@ -106,14 +106,14 @@
       "starOnGitHub": "Star DeerFlow on GitHub"
     },
     "welcome": {
-      "greeting": "👋 Hello, there!",
-      "description": "Welcome to 🦌 DeerFlow, a deep research assistant built on cutting-edge language models, helps you search on web, browse information, and handle complex tasks."
+      "greeting": "👋 Hello, astronaut!",
+      "description": "Welcome to AskSatellite, a deep research assistant about your satellite."
     },
     "conversationStarters": [
-      "How many times taller is the Eiffel Tower than the tallest building in the world?",
-      "How many years does an average Tesla battery last compared to a gasoline engine?",
-      "How many liters of water are required to produce 1 kg of beef?",
-      "How many times faster is the speed of light compared to the speed of sound?"
+      "How can high-resolution satellite imagery optimize precision agriculture and crop yield monitoring?",
+      "What are the advantages of SAR technology for disaster response in all-weather and day-night conditions?",
+      "How do remote sensing solutions track global carbon emissions and support environmental ESG reporting?",
+      "What role does satellite data play in urban planning and monitoring illegal construction in mega-cities?"
     ],
     "inputBox": {
       "deepThinking": "Deep Thinking",

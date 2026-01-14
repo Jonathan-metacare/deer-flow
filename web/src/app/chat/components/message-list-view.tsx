@@ -191,7 +191,7 @@ function MessageListItem({
                 <Markdown
                   className={cn(
                     message.role === "user" &&
-                      "prose-invert not-dark:text-secondary dark:text-inherit",
+                    "prose-invert not-dark:text-secondary dark:text-inherit",
                   )}
                 >
                   {message?.content}
@@ -235,12 +235,12 @@ function MessageBubble({
   return (
     <div
       className={cn(
-        "group flex w-auto max-w-[90vw] flex-col rounded-2xl px-4 py-3 break-words",
+        "group flex w-auto max-w-full flex-col rounded-2xl px-4 py-3",
         message.role === "user" && "bg-brand rounded-ee-none",
         message.role === "assistant" && "bg-card rounded-es-none",
         className,
       )}
-      style={{ wordBreak: "break-all" }}
+      style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
     >
       {children}
     </div>
@@ -519,23 +519,22 @@ function PlanCard({
             <CardHeader>
               <CardTitle>
                 <Markdown animated={false}>
-                  {`### ${
-                    plan.title !== undefined && plan.title !== ""
-                      ? plan.title
-                      : t("deepResearch")
-                  }`}
+                  {`### ${plan.title !== undefined && plan.title !== ""
+                    ? plan.title
+                    : t("deepResearch")
+                    }`}
                 </Markdown>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div style={{ wordBreak: 'break-all', whiteSpace: 'normal' }}>
+              <div style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 <Markdown className="opacity-80" animated={false}>
                   {plan.thought}
                 </Markdown>
                 {plan.steps && (
                   <ul className="my-2 flex list-decimal flex-col gap-4 border-l-[2px] pl-8">
                     {plan.steps.map((step, i) => (
-                      <li key={`step-${i}`} style={{ wordBreak: 'break-all', whiteSpace: 'normal' }}>
+                      <li key={`step-${i}`} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         <div className="flex items-start gap-2">
                           <div className="flex-1">
                             <h3 className="mb flex items-center gap-2 text-lg font-medium">
@@ -553,7 +552,7 @@ function PlanCard({
                                 </Tooltip>
                               )}
                             </h3>
-                            <div className="text-muted-foreground text-sm" style={{ wordBreak: 'break-all', whiteSpace: 'normal' }}>
+                            <div className="text-muted-foreground text-sm" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                               <Markdown animated={false}>
                                 {step.description}
                               </Markdown>

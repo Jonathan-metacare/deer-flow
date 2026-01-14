@@ -127,17 +127,17 @@ export function InputBox({
   return (
     <div
       className={cn(
-        "bg-card relative flex h-full w-full flex-col rounded-[24px] border",
+        "bg-card relative flex h-full w-full flex-col overflow-hidden rounded-[24px] border",
         className,
       )}
       ref={containerRef}
     >
-      <div className="w-full">
+      <div className="w-full flex-grow">
         <AnimatePresence>
           {feedback && (
             <motion.div
               ref={feedbackRef}
-              className="bg-background border-brand absolute top-0 left-0 mt-2 ml-4 flex items-center justify-center gap-1 rounded-2xl border px-2 py-0.5"
+              className="bg-background border-brand absolute top-0 left-0 z-10 mt-2 ml-4 flex items-center justify-center gap-1 rounded-2xl border px-2 py-0.5"
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0 }}
@@ -201,7 +201,7 @@ export function InputBox({
         </AnimatePresence>
         <MessageInput
           className={cn(
-            "h-24 px-4 pt-5",
+            "h-full px-4 pt-5 pb-2",
             feedback && "pt-9",
             isEnhanceAnimating && "transition-all duration-500",
           )}
@@ -212,8 +212,8 @@ export function InputBox({
           onChange={setCurrentPrompt}
         />
       </div>
-      <div className="flex items-center px-4 py-2">
-        <div className="flex grow gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-t bg-muted/20">
+        <div className="flex flex-wrap grow gap-1.5">
           {config?.models?.reasoning && config.models.reasoning.length > 0 && (
             <Tooltip
               className="max-w-60"
@@ -234,15 +234,15 @@ export function InputBox({
             >
               <Button
                 className={cn(
-                  "rounded-2xl",
-                  enableDeepThinking && "!border-brand !text-brand",
+                  "rounded-2xl h-8 px-2.5 text-xs font-medium",
+                  enableDeepThinking && "!border-brand !text-brand bg-brand/5",
                 )}
                 variant="outline"
                 onClick={() => {
                   setEnableDeepThinking(!enableDeepThinking);
                 }}
               >
-                <Lightbulb /> {t("deepThinking")}
+                <Lightbulb size={14} className="mr-1" /> {t("deepThinking")}
               </Button>
             </Tooltip>
           )}
@@ -262,60 +262,58 @@ export function InputBox({
           >
             <Button
               className={cn(
-                "rounded-2xl",
-                backgroundInvestigation && "!border-brand !text-brand",
+                "rounded-2xl h-8 px-2.5 text-xs font-medium",
+                backgroundInvestigation && "!border-brand !text-brand bg-brand/5",
               )}
               variant="outline"
               onClick={() =>
                 setEnableBackgroundInvestigation(!backgroundInvestigation)
               }
             >
-              <Detective /> {t("investigation")}
+              <Detective className="mr-1 h-3.5 w-3.5" /> {t("investigation")}
             </Button>
           </Tooltip>
           <ReportStyleDialog />
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Tooltip title={t("enhancePrompt")}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "hover:bg-accent h-10 w-10",
-                isEnhancing && "animate-pulse",
-              )}
-              onClick={handleEnhancePrompt}
-              disabled={isEnhancing || currentPrompt.trim() === ""}
-            >
-              {isEnhancing ? (
-                <div className="flex h-10 w-10 items-center justify-center">
-                  <div className="bg-foreground h-3 w-3 animate-bounce rounded-full opacity-70" />
-                </div>
-              ) : (
-                <MagicWandIcon className="text-brand" />
-              )}
-            </Button>
-          </Tooltip>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "hover:bg-accent h-8 w-8",
+              isEnhancing && "animate-pulse",
+            )}
+            onClick={handleEnhancePrompt}
+            disabled={isEnhancing || currentPrompt.trim() === ""}
+          >
+            {isEnhancing ? (
+              <div className="flex h-8 w-8 items-center justify-center">
+                <div className="bg-foreground h-2 w-2 animate-bounce rounded-full opacity-70" />
+              </div>
+            ) : (
+              <MagicWandIcon className="text-brand h-4 w-4" />
+            )}
+          </Button>
           <Tooltip title={responding ? tCommon("stop") : tCommon("send")}>
             <Button
-              variant="outline"
+              variant="default"
               size="icon"
-              className={cn("h-10 w-10 rounded-full")}
+              className={cn("h-8 w-8 rounded-full shadow-sm")}
               onClick={() => inputRef.current?.submit()}
             >
               {responding ? (
-                <div className="flex h-10 w-10 items-center justify-center">
-                  <div className="bg-foreground h-4 w-4 rounded-sm opacity-70" />
+                <div className="flex h-8 w-8 items-center justify-center">
+                  <div className="bg-primary-foreground h-3 w-3 rounded-sm" />
                 </div>
               ) : (
-                <ArrowUp />
+                <ArrowUp className="h-4 w-4" />
               )}
             </Button>
           </Tooltip>
         </div>
       </div>
       {isEnhancing && (
-        <>
+        <div className="absolute inset-0 pointer-events-none">
           <BorderBeam
             duration={5}
             size={250}
@@ -327,7 +325,7 @@ export function InputBox({
             size={250}
             className="from-transparent via-blue-500 to-transparent"
           />
-        </>
+        </div>
       )}
     </div>
   );

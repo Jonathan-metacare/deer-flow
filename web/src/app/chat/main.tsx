@@ -20,18 +20,10 @@ export default function Main() {
   return (
     <div
       className={cn(
-        "flex h-full w-full justify-center-safe px-4 pt-12 pb-4",
+        "flex h-full w-full justify-end px-4 pt-12 pb-4",
         doubleColumnMode && "gap-8",
       )}
     >
-      <MessagesBlock
-        className={cn(
-          "shrink-0 transition-all duration-300 ease-out",
-          !doubleColumnMode &&
-            `w-[768px] translate-x-[min(max(calc((100vw-538px)*0.75),575px)/2,960px/2)]`,
-          doubleColumnMode && `w-[538px]`,
-        )}
-      />
       <ResearchBlock
         className={cn(
           "w-[min(max(calc((100vw-538px)*0.75),575px),960px)] pb-4 transition-all duration-300 ease-out",
@@ -40,6 +32,8 @@ export default function Main() {
         )}
         researchId={openResearchId}
       />
+      <MessagesBlock className="z-[100]" />
+
     </div>
   );
 }

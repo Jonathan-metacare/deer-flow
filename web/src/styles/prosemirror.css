@@ -153,18 +153,18 @@
 
 /* Custom TODO list checkboxes – shoutout to this awesome tutorial: https://moderncss.dev/pure-css-custom-checkbox-style/ */
 
-ul[data-type="taskList"] li > label {
+ul[data-type="taskList"] li>label {
   margin-right: 0.2rem;
   user-select: none;
 }
 
 @media screen and (max-width: 768px) {
-  ul[data-type="taskList"] li > label {
+  ul[data-type="taskList"] li>label {
     margin-right: 0.5rem;
   }
 }
 
-ul[data-type="taskList"] li > label input[type="checkbox"] {
+ul[data-type="taskList"] li>label input[type="checkbox"] {
   -webkit-appearance: none;
   appearance: none;
   background-color: hsl(var(--background));
@@ -203,7 +203,7 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
   }
 }
 
-ul[data-type="taskList"] li[data-checked="true"] > div > p {
+ul[data-type="taskList"] li[data-checked="true"]>div>p {
   color: var(--muted-foreground);
   text-decoration: line-through;
   text-decoration-thickness: 2px;
@@ -273,7 +273,7 @@ iframe {
   outline: 0px solid transparent;
 }
 
-div[data-youtube-video] > iframe {
+div[data-youtube-video]>iframe {
   cursor: move;
   aspect-ratio: 16 / 9;
   width: 100%;
@@ -285,31 +285,34 @@ div[data-youtube-video] > iframe {
 }
 
 @media only screen and (max-width: 480px) {
-  div[data-youtube-video] > iframe {
+  div[data-youtube-video]>iframe {
     max-height: 50px;
   }
 }
 
 @media only screen and (max-width: 720px) {
-  div[data-youtube-video] > iframe {
+  div[data-youtube-video]>iframe {
     max-height: 100px;
   }
 }
 
 /* CSS for bold coloring and highlighting issue*/
-span[style] > strong {
+span[style]>strong {
   color: inherit;
 }
 
-mark[style] > strong {
+mark[style]>strong {
   color: inherit;
 }
 
-.prose ol, .prose ul {
+.prose ol,
+.prose ul {
   margin-left: 1.2em;
   color: #b0b0b0;
   font-size: 0.98em;
 }
-.prose ol > li::marker, .prose ul > li::marker {
+
+.prose ol>li::marker,
+.prose ul>li::marker {
   color: #b0b0b0;
 }
