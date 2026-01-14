@@ -19,9 +19,9 @@
     "title": "DeerFlow"
   },
   "hero": {
-    "title": "Deep Research",
-    "subtitle": "at Your Fingertips",
-    "description": "Meet DeerFlow, your personal Deep Research assistant. With powerful tools like search engines, web crawlers, Python and MCP services, it delivers instant insights, comprehensive reports, and even captivating podcasts.",
+    "title": "Ask Satellite",
+    "subtitle": "that you own",
+    "description": "Meet AskSatellite, your personal Deep Research assistant. It delivers instant insights, comprehensive reports.",
     "footnote": "* DEER stands for Deep Exploration and Efficient Research."
   },
   "settings": {
@@ -95,9 +95,10 @@
     }
   },
   "footer": {
-    "quote": "Originated from Open Source, give back to Open Source.",
-    "license": "Licensed under MIT License",
-    "copyright": "DeerFlow"
+    "quote": "From space, there are no borders.",
+    "quote-author": "--- Frank White, The Overview Effect",
+    "license": "Privacy Policy | Terms of Use | Cookie Policy",
+    "copyright": "AskSatellite"
   },
   "chat": {
     "page": {
@@ -128,7 +129,8 @@
       },
       "enhancePrompt": "Enhance prompt with AI",
       "on": "On",
-      "off": "Off"
+      "off": "Off",
+      "placeholder": "Ask anything..."
     },
     "research": {
       "deepResearch": "Deep Research",

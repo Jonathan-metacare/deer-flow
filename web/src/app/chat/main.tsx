@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import { useStore } from "~/core/store";
 import { cn } from "~/lib/utils";
 
+import { GoogleMapBackground } from "~/components/google-map-background";
 import { MessagesBlock } from "./components/messages-block";
 import { ResearchBlock } from "./components/research-block";
 
@@ -20,13 +21,14 @@ export default function Main() {
   return (
     <div
       className={cn(
-        "flex h-full w-full justify-end px-4 pt-12 pb-4",
+        "relative flex h-full w-full justify-end px-4 pt-12 pb-4",
         doubleColumnMode && "gap-8",
       )}
     >
+      <GoogleMapBackground />
       <ResearchBlock
         className={cn(
-          "w-[min(max(calc((100vw-538px)*0.75),575px),960px)] pb-4 transition-all duration-300 ease-out",
+          "relative z-10 w-[min(max(calc((100vw-538px)*0.75),575px),960px)] pb-4 transition-all duration-300 ease-out",
           !doubleColumnMode && "scale-0",
           doubleColumnMode && "",
         )}

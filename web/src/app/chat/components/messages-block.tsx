@@ -1,7 +1,8 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { useCallback, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Option, Resource } from "~/core/messages";
 import { sendMessage, useMessageIds, useStore } from "~/core/store";
@@ -16,6 +17,8 @@ export function MessagesBlock({ className }: { className?: string }) {
   const responding = useStore((state) => state.responding);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [feedback, setFeedback] = useState<{ option: Option } | null>(null);
+  const searchParams = useSearchParams();
+  const query = searchParams.get("q");
 
   const handleSend = useCallback(
     async (
@@ -59,6 +62,17 @@ export function MessagesBlock({ className }: { className?: string }) {
   const handleRemoveFeedback = useCallback(() => {
     setFeedback(null);
   }, [setFeedback]);
+
+  // Handle initial query from URL
+  const hasTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (query && !hasTriggeredRef.current && messageIds.length === 0 && !responding) {
+      hasTriggeredRef.current = true;
+      // Remove the query param from URL to clean up (optional but nice)
+      window.history.replaceState(null, "", "/chat");
+      void handleSend(query);
+    }
+  }, [query, handleSend, messageIds.length, responding]);
 
   return (
     <div
