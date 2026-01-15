@@ -570,7 +570,12 @@ async def _astream_workflow_generator(
 
     if not auto_accepted_plan and interrupt_feedback:
         logger.debug(f"[{safe_thread_id}] Creating resume command with interrupt_feedback: {safe_feedback}")
-        resume_msg = f"[{interrupt_feedback}]"
+        # Only wrap in brackets if not already wrapped
+        if interrupt_feedback.startswith("[") and "]" in interrupt_feedback:
+            resume_msg = interrupt_feedback
+        else:
+            resume_msg = f"[{interrupt_feedback}]"
+
         if messages:
             resume_msg += f" {messages[-1]['content']}"
         workflow_input = Command(resume=resume_msg)

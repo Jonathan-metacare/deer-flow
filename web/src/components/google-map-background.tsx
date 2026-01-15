@@ -102,6 +102,47 @@ export function GoogleMapBackground({ className }: { className?: string }) {
     const targetMarker = useRef<any>(null);
     const userMarker = useRef<any>(null);
     const scriptLoaded = useRef(false);
+    const drawingManagerRef = useRef<any>(null);
+    const currentOverlayRef = useRef<any>(null);
+
+    // Watch for ongoing research to lock the map
+    const ongoingResearchId = useStore((state) => state.ongoingResearchId);
+    const isLocked = ongoingResearchId !== null;
+
+    useEffect(() => {
+        if (!drawingManagerRef.current) return;
+
+        if (isLocked) {
+            // Lock drawing and editing
+            drawingManagerRef.current.setDrawingMode(null);
+            drawingManagerRef.current.setOptions({
+                drawingControl: false
+            });
+            if (currentOverlayRef.current) {
+                currentOverlayRef.current.setEditable(false);
+                currentOverlayRef.current.setDraggable(false);
+                // Update color to Red to indicate "Active Research" status
+                currentOverlayRef.current.setOptions({
+                    fillColor: "#ff4d4f",
+                    strokeColor: "#ff4d4f"
+                });
+            }
+        } else {
+            // Unlock if no research is ongoing
+            drawingManagerRef.current.setOptions({
+                drawingControl: true
+            });
+            if (currentOverlayRef.current) {
+                currentOverlayRef.current.setEditable(true);
+                currentOverlayRef.current.setDraggable(true);
+                // Back to default blue if research cleared
+                currentOverlayRef.current.setOptions({
+                    fillColor: "#007aff",
+                    strokeColor: "#007aff"
+                });
+            }
+        }
+    }, [isLocked]);
 
     // Sync map center with store query
     const mapCenterQuery = useStore((state) => state.mapCenterQuery);
@@ -182,6 +223,7 @@ export function GoogleMapBackground({ className }: { className?: string }) {
                         fillColor: "#007aff",
                         fillOpacity: 0.3,
                         strokeWeight: 2,
+                        strokeColor: "#007aff",
                         clickable: true,
                         editable: true,
                         zIndex: 1,
@@ -190,21 +232,21 @@ export function GoogleMapBackground({ className }: { className?: string }) {
                         fillColor: "#007aff",
                         fillOpacity: 0.3,
                         strokeWeight: 2,
+                        strokeColor: "#007aff",
                         clickable: true,
                         editable: true,
                         zIndex: 1,
                     }
                 });
                 drawingManager.setMap(map);
-
-                let currentOverlay: any = null;
+                drawingManagerRef.current = drawingManager;
 
                 window.google.maps.event.addListener(drawingManager, 'overlaycomplete', (event: any) => {
                     // Clear previous overlay
-                    if (currentOverlay) {
-                        currentOverlay.setMap(null);
+                    if (currentOverlayRef.current) {
+                        currentOverlayRef.current.setMap(null);
                     }
-                    currentOverlay = event.overlay;
+                    currentOverlayRef.current = event.overlay;
 
                     // Extract coordinates based on shape type
                     let regionData: any = null;

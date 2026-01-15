@@ -460,9 +460,11 @@ def human_feedback_node(
 
         # Normalize feedback string
         feedback_normalized = str(feedback).strip().upper()
+        # Normalize feedback string for checking
+        feedback_check = feedback_normalized.lstrip("[ ")
 
         # if the feedback is not accepted, return the planner node
-        if feedback_normalized.startswith("[EDIT_PLAN]"):
+        if feedback_check.startswith("EDIT_PLAN"):
             logger.info(f"Plan edit requested by user: {feedback}")
             return Command(
                 update={
@@ -473,10 +475,10 @@ def human_feedback_node(
                 },
                 goto="planner",
             )
-        elif feedback_normalized.startswith("[ACCEPTED]"):
+        elif feedback_check.startswith("ACCEPTED"):
             logger.info("Plan is accepted by user.")
         else:
-            logger.warning(f"Unsupported feedback format: {feedback}. Please use '[ACCEPTED]' to accept or '[EDIT_PLAN]' to edit.")
+            logger.warning(f"Unsupported feedback format: {feedback}. Normalized: {feedback_normalized}. Please use '[ACCEPTED]' to accept or '[EDIT_PLAN]' to edit.")
             return Command(
                 update=preserve_state_meta_fields(state),
                 goto="planner"
