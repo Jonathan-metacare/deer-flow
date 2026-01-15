@@ -7,12 +7,12 @@ export interface Message {
   id: string;
   threadId: string;
   agent?:
-    | "coordinator"
-    | "planner"
-    | "researcher"
-    | "coder"
-    | "reporter"
-    | "podcast";
+  | "coordinator"
+  | "planner"
+  | "researcher"
+  | "coder"
+  | "reporter"
+  | "podcast";
   role: MessageRole;
   isStreaming?: boolean;
   content: string;
@@ -24,6 +24,8 @@ export interface Message {
   finishReason?: "stop" | "interrupt" | "tool_calls";
   interruptFeedback?: string;
   resources?: Array<Resource>;
+  location?: string;
+  timeframe?: string;
 }
 
 export interface Option {

@@ -479,6 +479,16 @@ function PlanCard({
     return parseJSON(message.content ?? "", {});
   }, [message.content]);
 
+  // Log location and timeframe if available (wrapped in effect to prevent noise during streaming re-renders)
+  React.useEffect(() => {
+    if (message.location || message.timeframe) {
+      console.log("Extracted Info:", {
+        location: message.location,
+        timeframe: message.timeframe
+      });
+    }
+  }, [message.location, message.timeframe]);
+
   const reasoningContent = message.reasoningContent;
   const hasMainContent = Boolean(
     message.content && message.content.trim() !== "",

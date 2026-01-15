@@ -45,6 +45,8 @@ logger = logging.getLogger(__name__)
 def handoff_to_planner(
     research_topic: Annotated[str, "The topic of the research task to be handed off."],
     locale: Annotated[str, "The user's detected language locale (e.g., en-US, zh-CN)."],
+    location: Annotated[str, "The specific geographic location for the research (e.g., city, region, coordinates). Defaults to empty string if not applicable."] = "",
+
 ):
     """Handoff to planner agent to do plan."""
     # This tool is not returning anything: we're just using it
@@ -58,6 +60,8 @@ def handoff_after_clarification(
     research_topic: Annotated[
         str, "The clarified research topic based on all clarification rounds."
     ],
+    location: Annotated[str, "The specific geographic location for the research (e.g., city, region, coordinates). Defaults to empty string if not applicable."] = "",
+    timeframe: Annotated[str, "The specific time period for the research (e.g., dates, years, seasons). Defaults to empty string if not applicable."] = "",
 ):
     """Handoff to planner after clarification rounds are complete. Pass all clarification history to planner for analysis."""
     return
@@ -115,6 +119,8 @@ def preserve_state_meta_fields(state: State) -> dict:
         "max_clarification_rounds": state.get("max_clarification_rounds", 3),
         "clarification_rounds": state.get("clarification_rounds", 0),
         "resources": state.get("resources", []),
+        "location": state.get("location", ""),
+        "timeframe": state.get("timeframe", ""),
     }
 
 
@@ -270,6 +276,9 @@ def planner_node(
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
 
     # For clarification feature: use the clarified research topic (complete history)
+    location = state.get("location", "")
+    timeframe = state.get("timeframe", "30")
+
     if state.get("enable_clarification", False) and state.get(
         "clarified_research_topic"
     ):
@@ -378,7 +387,13 @@ def planner_node(
         )
     return Command(
         update={
-            "messages": [AIMessage(content=full_response, name="planner")],
+            "messages": [
+                AIMessage(
+                    content=full_response,
+                    name="planner",
+                    additional_kwargs={"location": location, "timeframe": timeframe},
+                )
+            ],
             "current_plan": full_response,
             **preserve_state_meta_fields(state),
         },
@@ -734,6 +749,10 @@ def coordinator_node(
     if response.content:
         messages.append(HumanMessage(content=response.content, name="coordinator"))
 
+    # Initialize location and timeframe
+    location = ""
+    timeframe = ""
+
     # Process tool calls for BOTH branches (legacy and clarification)
     if response.tool_calls:
         try:
@@ -743,6 +762,9 @@ def coordinator_node(
 
                 if tool_name in ["handoff_to_planner", "handoff_after_clarification"]:
                     logger.info("Handing off to planner")
+                    location = tool_args.get("location", "")
+                    timeframe = tool_args.get("timeframe", "")
+
                     goto = "planner"
 
                     if not enable_clarification and tool_args.get("research_topic"):
@@ -796,6 +818,8 @@ def coordinator_node(
             "research_topic": research_topic,
             "clarified_research_topic": clarified_research_topic_value,
             "resources": configurable.resources,
+            "location": location,
+            "timeframe": timeframe,
             "clarification_rounds": clarification_rounds,
             "clarification_history": clarification_history,
             "is_clarification_complete": goto != "coordinator",

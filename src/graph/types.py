@@ -21,6 +21,8 @@ class State(MessagesState):
     )
     observations: list[str] = []
     resources: list[Resource] = []
+    location: str = ""  # Extracted location from user query
+    timeframe: str = ""  # Extracted timeframe from user query
     plan_iterations: int = 0
     current_plan: Plan | str = None
     final_report: str = ""

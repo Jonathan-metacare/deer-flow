@@ -30,6 +30,7 @@ interface GenericEvent<T extends string, D extends object> {
     agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter";
     role: "user" | "assistant" | "tool";
     finish_reason?: "stop" | "tool_calls" | "interrupt";
+    additional_kwargs?: Record<string, unknown>;
   } & D;
 }
 
@@ -39,8 +40,10 @@ export interface MessageChunkEvent
     {
       content?: string;
       reasoning_content?: string;
+      location?: string;
+      timeframe?: string;
     }
-  > {}
+  > { }
 
 export interface ToolCallsEvent
   extends GenericEvent<
@@ -49,7 +52,7 @@ export interface ToolCallsEvent
       tool_calls: ToolCall[];
       tool_call_chunks: ToolCallChunk[];
     }
-  > {}
+  > { }
 
 export interface ToolCallChunksEvent
   extends GenericEvent<
@@ -57,7 +60,7 @@ export interface ToolCallChunksEvent
     {
       tool_call_chunks: ToolCallChunk[];
     }
-  > {}
+  > { }
 
 export interface ToolCallResultEvent
   extends GenericEvent<
@@ -66,7 +69,7 @@ export interface ToolCallResultEvent
       tool_call_id: string;
       content?: string;
     }
-  > {}
+  > { }
 
 export interface InterruptEvent
   extends GenericEvent<
@@ -74,7 +77,7 @@ export interface InterruptEvent
     {
       options: Option[];
     }
-  > {}
+  > { }
 
 export type ChatEvent =
   | MessageChunkEvent

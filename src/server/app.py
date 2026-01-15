@@ -12,7 +12,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
 from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.memory import InMemoryStore
@@ -304,6 +304,15 @@ def _create_event_stream_message(
             "finish_reason"
         )
 
+    if message_chunk.additional_kwargs.get("location"):
+        event_stream_message["location"] = message_chunk.additional_kwargs.get(
+            "location"
+        )
+
+    if message_chunk.additional_kwargs.get("timeframe"):
+        event_stream_message["timeframe"] = message_chunk.additional_kwargs.get(
+            "timeframe"
+        )
     return event_stream_message
 
 
@@ -374,65 +383,34 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         
         logger.debug(f"[{safe_thread_id}] Yielding tool_call_result event")
         yield _make_event("tool_call_result", event_stream_message)
-    elif isinstance(message_chunk, AIMessageChunk):
-        # AI Message - Raw message tokens
-        has_tool_calls = bool(message_chunk.tool_calls)
-        has_chunks = bool(message_chunk.tool_call_chunks)
-        logger.debug(f"[{safe_thread_id}] Processing AIMessageChunk, tool_calls={has_tool_calls}, tool_call_chunks={has_chunks}")
-        
-        if message_chunk.tool_calls:
+    elif isinstance(message_chunk, (AIMessage, AIMessageChunk)):
+        # AI Message - Raw message tokens or complete message
+        # Use getattr safely as AIMessage might not have tool_call_chunks (only AIMessageChunk has it)
+        tool_calls = getattr(message_chunk, "tool_calls", [])
+        tool_call_chunks = getattr(message_chunk, "tool_call_chunks", [])
+
+        if tool_calls:
             # AI Message - Tool Call (complete tool calls)
-            safe_tool_names = [sanitize_tool_name(tc.get('name', 'unknown')) for tc in message_chunk.tool_calls]
-            logger.debug(f"[{safe_thread_id}] AIMessageChunk has complete tool_calls: {safe_tool_names}")
-            event_stream_message["tool_calls"] = message_chunk.tool_calls
+            safe_tool_names = [sanitize_tool_name(tc.get('name', 'unknown')) for tc in tool_calls]
+            logger.debug(f"[{safe_thread_id}] AI Message has complete tool_calls: {safe_tool_names}")
+            event_stream_message["tool_calls"] = tool_calls
             
-            # Process tool_call_chunks with proper index-based grouping
-            processed_chunks = _process_tool_call_chunks(
-                message_chunk.tool_call_chunks
-            )
-            if processed_chunks:
-                event_stream_message["tool_call_chunks"] = processed_chunks
-                safe_chunk_names = [sanitize_tool_name(c.get('name')) for c in processed_chunks]
-                logger.debug(
-                    f"[{safe_thread_id}] Tool calls: {safe_tool_names}, "
-                    f"Processed chunks: {len(processed_chunks)}"
-                )
+            # Process tool_call_chunks if present (index-based grouping)
+            if tool_call_chunks:
+                processed_chunks = _process_tool_call_chunks(tool_call_chunks)
+                if processed_chunks:
+                    event_stream_message["tool_call_chunks"] = processed_chunks
             
             logger.debug(f"[{safe_thread_id}] Yielding tool_calls event")
             yield _make_event("tool_calls", event_stream_message)
-        elif message_chunk.tool_call_chunks:
+        elif tool_call_chunks:
             # AI Message - Tool Call Chunks (streaming)
-            chunks_count = len(message_chunk.tool_call_chunks)
-            logger.debug(f"[{safe_thread_id}] AIMessageChunk has streaming tool_call_chunks: {chunks_count} chunks")
-            processed_chunks = _process_tool_call_chunks(
-                message_chunk.tool_call_chunks
-            )
+            chunks_count = len(tool_call_chunks)
+            logger.debug(f"[{safe_thread_id}] AI Message has streaming tool_call_chunks: {chunks_count} chunks")
+            processed_chunks = _process_tool_call_chunks(tool_call_chunks)
             
-            # Emit separate events for chunks with different indices (tool call boundaries)
             if processed_chunks:
-                prev_chunk = None
-                for chunk in processed_chunks:
-                    current_index = chunk.get("index")
-                    
-                    # Log index transitions to detect tool call boundaries
-                    if prev_chunk is not None and current_index != prev_chunk.get("index"):
-                        prev_name = sanitize_tool_name(prev_chunk.get('name'))
-                        curr_name = sanitize_tool_name(chunk.get('name'))
-                        logger.debug(
-                            f"[{safe_thread_id}] Tool call boundary detected: "
-                            f"index {prev_chunk.get('index')} ({prev_name}) -> "
-                            f"{current_index} ({curr_name})"
-                        )
-                    
-                    prev_chunk = chunk
-                
-                # Include all processed chunks in the event
                 event_stream_message["tool_call_chunks"] = processed_chunks
-                safe_chunk_names = [sanitize_tool_name(c.get('name')) for c in processed_chunks]
-                logger.debug(
-                    f"[{safe_thread_id}] Streamed {len(processed_chunks)} tool call chunk(s): "
-                    f"{safe_chunk_names}"
-                )
             
             logger.debug(f"[{safe_thread_id}] Yielding tool_call_chunks event")
             yield _make_event("tool_call_chunks", event_stream_message)
@@ -448,9 +426,12 @@ async def _stream_graph_events(
 ):
     """Stream events from the graph and process them."""
     safe_thread_id = sanitize_thread_id(thread_id)
-    logger.debug(f"[{safe_thread_id}] Starting graph event stream with agent nodes")
+    logger.info(f"[{safe_thread_id}] Starting graph event stream with agent nodes")
     try:
         event_count = 0
+        current_node = None
+        current_node_message_id = None
+        
         async for agent, _, event_data in graph_instance.astream(
             workflow_input,
             config=workflow_config,
@@ -463,34 +444,47 @@ async def _stream_graph_events(
             
             if isinstance(event_data, dict):
                 if "__interrupt__" in event_data:
-                    logger.debug(
+                    logger.info(
                         f"[{safe_thread_id}] Processing interrupt event: "
-                        f"id={getattr(event_data['__interrupt__'][0], 'id', 'unknown') if isinstance(event_data['__interrupt__'], (list, tuple)) and len(event_data['__interrupt__']) > 0 else 'unknown'}, "
-                        f"value_len={len(getattr(event_data['__interrupt__'][0], 'value', '')) if isinstance(event_data['__interrupt__'], (list, tuple)) and len(event_data['__interrupt__']) > 0 and hasattr(event_data['__interrupt__'][0], 'value') and hasattr(event_data['__interrupt__'][0].value, '__len__') else 'unknown'}"
+                        f"id={getattr(event_data['__interrupt__'][0], 'id', 'unknown') if isinstance(event_data['__interrupt__'], (list, tuple)) and len(event_data['__interrupt__']) > 0 else 'unknown'}"
                     )
                     yield _create_interrupt_event(thread_id, event_data)
-                logger.debug(f"[{safe_thread_id}] Dict event without interrupt, skipping")
+                    continue
+
+                # Note: We NO LONGER manually process "messages" from updates here
+                # because stream_mode="messages" already handles them.
+                # Processing them twice causes duplicates in the frontend.
+                logger.debug(f"[{safe_thread_id}] Dict event processed, continuing")
                 continue
 
+            # Now we are in "messages" mode
             message_chunk, message_metadata = cast(
-                tuple[BaseMessage, dict[str, Any]], event_data
+                tuple[BaseMessage, dict], event_data
             )
-            
-            safe_node = sanitize_agent_name(message_metadata.get('langgraph_node', 'unknown'))
-            safe_step = sanitize_log_input(message_metadata.get('langgraph_step', 'unknown'))
-            logger.debug(
-                f"[{safe_thread_id}] Processing message chunk: "
-                f"type={type(message_chunk).__name__}, "
-                f"node={safe_node}, "
-                f"step={safe_step}"
-            )
+            node_name = message_metadata.get("langgraph_node")
+
+            # ID Synchronization & Deduplication:
+            # LangGraph yields message tokens (chunks) AND then final node outputs (full messages).
+            # To avoid duplicates in the UI, we sync them and strip redundant text.
+            if node_name != current_node:
+                current_node = node_name
+                current_node_message_id = getattr(message_chunk, 'id', None)
+            elif current_node_message_id and getattr(message_chunk, 'id', None) != current_node_message_id:
+                # Same node execution, but different ID? This is the final full output.
+                # Sync ID so metadata (like 'location') merges into the existing UI message.
+                message_chunk.id = current_node_message_id
+                
+                # If we already streamed text for this node, strip it from the final message 
+                # to prevent content doubling in the frontend.
+                if message_chunk.content and not isinstance(message_chunk, AIMessageChunk):
+                    message_chunk.content = ""
 
             async for event in _process_message_chunk(
                 message_chunk, message_metadata, thread_id, agent
             ):
                 yield event
         
-        logger.debug(f"[{safe_thread_id}] Graph event stream completed. Total events: {event_count}")
+        logger.info(f"[{safe_thread_id}] Graph event stream completed. Total events: {event_count}")
     except asyncio.CancelledError:
         # User cancelled/interrupted the stream - this is normal, not an error
         logger.info(f"[{safe_thread_id}] Graph event stream cancelled by user after {event_count} events")

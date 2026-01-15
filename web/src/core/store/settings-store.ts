@@ -10,7 +10,7 @@ const SETTINGS_KEY = "deerflow.settings";
 const DEFAULT_SETTINGS: SettingsState = {
   general: {
     autoAcceptedPlan: false,
-    enableClarification: false,
+    enableClarification: true,
     maxClarificationRounds: 3,
     enableDeepThinking: false,
     enableBackgroundInvestigation: false,
@@ -86,14 +86,14 @@ export const saveSettings = () => {
 export const getChatStreamSettings = () => {
   let mcpSettings:
     | {
-        servers: Record<
-          string,
-          MCPServerMetadata & {
-            enabled_tools: string[];
-            add_to_agents: string[];
-          }
-        >;
-      }
+      servers: Record<
+        string,
+        MCPServerMetadata & {
+          enabled_tools: string[];
+          add_to_agents: string[];
+        }
+      >;
+    }
     | undefined = undefined;
   const { mcp, general } = useSettingsStore.getState();
   const mcpServers = mcp.servers.filter((server) => server.enabled);

@@ -44,7 +44,7 @@ function safeParseToolArgs(argsString: string): Record<string, unknown> {
 }
 
 export function mergeMessage(message: Message, event: ChatEvent) {
-  if (event.type === "message_chunk") {
+    if (event.type === "message_chunk") {
     mergeTextMessage(message, event);
   } else if (event.type === "tool_calls" || event.type === "tool_call_chunks") {
     mergeToolCallMessage(message, event);
@@ -82,6 +82,10 @@ function mergeTextMessage(message: Message, event: MessageChunkEvent) {
     message.reasoningContent = (message.reasoningContent ?? "") + event.data.reasoning_content;
     message.reasoningContentChunks = message.reasoningContentChunks ?? [];
     message.reasoningContentChunks.push(event.data.reasoning_content);
+  }
+  if (event.data.location || event.data.timeframe) {
+    message.location = event.data.location;
+    message.timeframe = event.data.timeframe;
   }
 }
 function convertToolChunkArgs(args: string) {
