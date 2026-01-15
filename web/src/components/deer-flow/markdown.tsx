@@ -62,7 +62,7 @@ export function Markdown({
     return plugins;
   }, [animated]);
   return (
-    <div className={cn(className, "prose dark:prose-invert")} style={style}>
+    <div className={cn(className, "prose dark:prose-invert max-w-full overflow-x-auto")} style={style}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={rehypePlugins}
@@ -124,19 +124,19 @@ function dropMarkdownQuote(markdown?: string | null): string | null {
   ];
 
   let result = markdown;
-  
+
   for (const { prefix, suffix, prefixLen } of patternsToRemove) {
     if (result.startsWith(prefix) && !result.endsWith(suffix)) {
       result = result.slice(prefixLen);
       break;  // remove prefix without suffix only once
     }
   }
-  
+
   let changed = true;
 
   while (changed) {
     changed = false;
-    
+
     for (const { prefix, suffix, prefixLen } of patternsToRemove) {
       let startIndex = 0;
       while ((startIndex = result.indexOf(prefix, startIndex)) !== -1) {
@@ -155,6 +155,6 @@ function dropMarkdownQuote(markdown?: string | null): string | null {
       }
     }
   }
-  
+
   return result;
 }

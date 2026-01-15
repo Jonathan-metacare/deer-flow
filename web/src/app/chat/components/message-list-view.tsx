@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
 import { Markdown } from "~/components/deer-flow/markdown";
@@ -152,7 +153,7 @@ function MessageListItem({
       let content: React.ReactNode;
       if (message.agent === "planner") {
         content = (
-          <div className="w-full px-4">
+          <div className="min-w-0 w-full px-4">
             <PlanCard
               message={message}
               waitForFeedback={waitForFeedback}
@@ -164,13 +165,13 @@ function MessageListItem({
         );
       } else if (message.agent === "podcast") {
         content = (
-          <div className="w-full px-4">
+          <div className="min-w-0 w-full px-4">
             <PodcastCard message={message} />
           </div>
         );
       } else if (startOfResearch) {
         content = (
-          <div className="w-full px-4">
+          <div className="min-w-0 w-full px-4">
             <ResearchCard
               researchId={message.id}
               onToggleResearch={onToggleResearch}
@@ -181,7 +182,7 @@ function MessageListItem({
         content = message.content ? (
           <div
             className={cn(
-              "flex w-full px-4",
+              "flex w-full px-4 min-w-0",
               message.role === "user" && "justify-end",
               className,
             )}
@@ -479,15 +480,20 @@ function PlanCard({
     return parseJSON(message.content ?? "", {});
   }, [message.content]);
 
-  // Log location and timeframe if available (wrapped in effect to prevent noise during streaming re-renders)
+  // Sync map center when location is available
   React.useEffect(() => {
-    if (message.location || message.timeframe) {
-      console.log("Extracted Info:", {
-        location: message.location,
-        timeframe: message.timeframe
-      });
+    if (message.location) {
+      useStore.getState().setMapCenterQuery(message.location);
     }
-  }, [message.location, message.timeframe]);
+  }, [message.location]);
+
+  // Log location and timeframe if available (wrapped in effect to prevent noise during streaming re-renders)
+  if (message.location || message.timeframe) {
+    console.log("Extracted Info:", {
+      location: message.location,
+      timeframe: message.timeframe
+    });
+  }
 
   const reasoningContent = message.reasoningContent;
   const hasMainContent = Boolean(
@@ -500,11 +506,21 @@ function PlanCard({
   // 判断是否应该显示计划：有主要内容就显示（无论是否还在流式传输）
   const shouldShowPlan = hasMainContent;
   const handleAccept = useCallback(async () => {
+    const selectedRegion = useStore.getState().selectedRegion;
+    if (!selectedRegion) {
+      toast.warning("Please select a research area on the map using drawing tools first.");
+      return;
+    }
     if (onSendMessage) {
+      const regionInfo = selectedRegion ? ` Region: ${JSON.stringify(selectedRegion)}` : "";
+      const feedbackString = `[ACCEPTED]${regionInfo}`;
+
+      console.log("🚀 Sending Feedback to Backend:", feedbackString);
+
       onSendMessage(
         `${GREETINGS[Math.floor(Math.random() * GREETINGS.length)]}! ${Math.random() > 0.5 ? "Let's get started." : "Let's start."}`,
         {
-          interruptFeedback: "accepted",
+          interruptFeedback: feedbackString,
         },
       );
     }
@@ -636,7 +652,7 @@ function PodcastCard({
   }, [data]);
   const [isPlaying, setIsPlaying] = useState(false);
   return (
-    <Card className={cn("w-[508px]", className)}>
+    <Card className={cn("max-w-[508px] w-full", className)}>
       <CardHeader>
         <div className="text-muted-foreground flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">

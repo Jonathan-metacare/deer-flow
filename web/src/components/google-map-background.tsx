@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { cn } from "~/lib/utils";
+import { useStore } from "~/core/store";
 
 // ==========================================
 // GOOGLE MAPS CONFIGURATION
@@ -97,7 +98,56 @@ const MAP_STYLES = [
 
 export function GoogleMapBackground({ className }: { className?: string }) {
     const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstance = useRef<any>(null);
+    const targetMarker = useRef<any>(null);
+    const userMarker = useRef<any>(null);
     const scriptLoaded = useRef(false);
+
+    // Sync map center with store query
+    const mapCenterQuery = useStore((state) => state.mapCenterQuery);
+    useEffect(() => {
+        if (!mapInstance.current || !mapCenterQuery || !window.google) return;
+
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: mapCenterQuery }, (results: any, status: any) => {
+            if (status === "OK" && results[0]) {
+                const location = results[0].geometry.location;
+                const map = mapInstance.current;
+
+                // --- Smooth "Fly To" Animation Sequence (Slower & Cinematic) ---
+                // 1. Zoom out more to create a stronger sense of movement
+                const currentZoom = map.getZoom();
+                map.setZoom(Math.max(currentZoom - 4, 4));
+
+                // 2. Pan to destination after 1.5s
+                setTimeout(() => {
+                    map.panTo(location);
+
+                    // Add or move target marker
+                    if (targetMarker.current) {
+                        targetMarker.current.setPosition(location);
+                        targetMarker.current.setTitle(mapCenterQuery);
+                    } else {
+                        targetMarker.current = new window.google.maps.Marker({
+                            position: location,
+                            map: map,
+                            title: mapCenterQuery,
+                            animation: window.google.maps.Animation.DROP,
+                        });
+                    }
+
+                    // 3. Zoom back in after another 1.5s (total 3s sequence)
+                    setTimeout(() => {
+                        map.setOptions({ gestureHandling: 'greedy' });
+                        map.setZoom(12);
+                    }, 1500);
+                }, 1500);
+
+            } else {
+                console.warn("Geocode was not successful for the following reason: " + status);
+            }
+        });
+    }, [mapCenterQuery]);
 
     useEffect(() => {
         if (!mapRef.current) return;
@@ -105,17 +155,119 @@ export function GoogleMapBackground({ className }: { className?: string }) {
         const initMap = () => {
             if (!mapRef.current || !window.google) return;
 
-            new window.google.maps.Map(mapRef.current, {
+            const map = new window.google.maps.Map(mapRef.current, {
                 center: DEFAULT_CENTER,
                 zoom: DEFAULT_ZOOM,
-                disableDefaultUI: true,
-                styles: MAP_STYLES,
+                disableDefaultUI: false,
+                fullscreenControl: false,
+                streetViewControl: false,
+                mapTypeControl: false, // Disable the Map/Satellite toggle
+                mapTypeId: 'hybrid',
                 backgroundColor: "transparent",
             });
+            mapInstance.current = map;
+
+            // Initialize Drawing Manager
+            if (window.google.maps.drawing) {
+                const drawingManager = new window.google.maps.drawing.DrawingManager({
+                    drawingControl: true,
+                    drawingControlOptions: {
+                        position: window.google.maps.ControlPosition.TOP_CENTER,
+                        drawingModes: [
+                            window.google.maps.drawing.OverlayType.POLYGON,
+                            window.google.maps.drawing.OverlayType.RECTANGLE,
+                        ],
+                    },
+                    polygonOptions: {
+                        fillColor: "#007aff",
+                        fillOpacity: 0.3,
+                        strokeWeight: 2,
+                        clickable: true,
+                        editable: true,
+                        zIndex: 1,
+                    },
+                    rectangleOptions: {
+                        fillColor: "#007aff",
+                        fillOpacity: 0.3,
+                        strokeWeight: 2,
+                        clickable: true,
+                        editable: true,
+                        zIndex: 1,
+                    }
+                });
+                drawingManager.setMap(map);
+
+                let currentOverlay: any = null;
+
+                window.google.maps.event.addListener(drawingManager, 'overlaycomplete', (event: any) => {
+                    // Clear previous overlay
+                    if (currentOverlay) {
+                        currentOverlay.setMap(null);
+                    }
+                    currentOverlay = event.overlay;
+
+                    // Extract coordinates based on shape type
+                    let regionData: any = null;
+                    if (event.type === window.google.maps.drawing.OverlayType.POLYGON) {
+                        const path = event.overlay.getPath();
+                        const coords = [];
+                        for (let i = 0; i < path.getLength(); i++) {
+                            coords.push({ lat: path.getAt(i).lat(), lng: path.getAt(i).lng() });
+                        }
+                        regionData = { type: 'polygon', coordinates: coords };
+                    } else if (event.type === window.google.maps.drawing.OverlayType.RECTANGLE) {
+                        const bounds = event.overlay.getBounds();
+                        regionData = {
+                            type: 'rectangle',
+                            bounds: {
+                                north: bounds.getNorthEast().lat(),
+                                south: bounds.getSouthWest().lat(),
+                                east: bounds.getNorthEast().lng(),
+                                west: bounds.getSouthWest().lng()
+                            }
+                        };
+                    }
+
+                    useStore.getState().setSelectedRegion(regionData);
+                    console.log("📍 Map Region Selected:", regionData);
+                });
+            }
+
+            // Try to set center to current location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const pos = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                        };
+                        map.setCenter(pos);
+
+                        // Add marker for user location
+                        if (userMarker.current) userMarker.current.setMap(null);
+                        userMarker.current = new window.google.maps.Marker({
+                            position: pos,
+                            map: map,
+                            icon: {
+                                path: window.google.maps.SymbolPath.CIRCLE,
+                                scale: 8,
+                                fillColor: "#4285F4",
+                                fillOpacity: 1,
+                                strokeWeight: 2,
+                                strokeColor: "white",
+                            },
+                            title: "Your Location",
+                        });
+                    },
+                    () => {
+                        // Fail silently and use DEFAULT_CENTER
+                    }
+                );
+            }
         };
 
         // Check if script is already loaded
-        if (window.google && window.google.maps) {
+        if (window.google && window.google.maps && window.google.maps.drawing) {
             initMap();
             return;
         }
@@ -123,10 +275,10 @@ export function GoogleMapBackground({ className }: { className?: string }) {
         if (scriptLoaded.current) return;
         scriptLoaded.current = true;
 
-        // Load Google Maps Script
+        // Load Google Maps Script with Drawing library
         const script = document.createElement("script");
         const keyParam = GOOGLE_MAPS_API_KEY ? `key=${GOOGLE_MAPS_API_KEY}&` : "";
-        script.src = `https://maps.googleapis.com/maps/api/js?${keyParam}callback=initMap`;
+        script.src = `https://maps.googleapis.com/maps/api/js?${keyParam}libraries=drawing&callback=initMap`;
         script.async = true;
         script.defer = true;
 

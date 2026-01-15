@@ -632,14 +632,14 @@ def coordinator_node(
         else:
             latest_user_content = ""
 
-        # Add clarification status for first round
-        if clarification_rounds == 0:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": "Clarification mode is ENABLED. Follow the 'Clarification Process' guidelines in your instructions.",
-                }
-            )
+        # Add a single, clear clarification instruction at the end to guide the current turn
+        clarification_instruction = (
+            f"CLARIFICATION MODE: Round {clarification_rounds}/{max_clarification_rounds}. "
+            f"If location or timeframe is missing, YOU MUST ask the user for them in PLAIN TEXT. "
+            "DO NOT call any tools when asking a question. "
+            "Only call a handoff tool if you have enough context."
+        )
+        messages.append({"role": "system", "content": clarification_instruction})
 
         current_response = latest_user_content or "No response"
         logger.info(
@@ -650,11 +650,6 @@ def coordinator_node(
             current_response,
         )
 
-        clarification_context = f"""Continuing clarification (round {clarification_rounds}/{max_clarification_rounds}):
-            User's latest response: {current_response}
-            Ask for remaining missing dimensions. Do NOT repeat questions or start new topics."""
-
-        messages.append({"role": "system", "content": clarification_context})
 
         # Bind both clarification tools - let LLM choose the appropriate one
         tools = [handoff_to_planner, handoff_after_clarification]
@@ -714,7 +709,7 @@ def coordinator_node(
                 updated_messages = list(state_messages)
                 if response.content:
                     updated_messages.append(
-                        HumanMessage(content=response.content, name="coordinator")
+                        AIMessage(content=response.content, name="coordinator")
                     )
 
                 return Command(
@@ -747,7 +742,7 @@ def coordinator_node(
     # ============================================================
     messages = list(state.get("messages", []) or [])
     if response.content:
-        messages.append(HumanMessage(content=response.content, name="coordinator"))
+        messages.append(AIMessage(content=response.content, name="coordinator"))
 
     # Initialize location and timeframe
     location = ""
