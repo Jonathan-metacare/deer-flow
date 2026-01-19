@@ -592,12 +592,12 @@ function PlanCard({
 
       console.log("🚀 Sending Feedback to Backend:", feedbackString);
 
-      // onSendMessage(
-      //   `${GREETINGS[Math.floor(Math.random() * GREETINGS.length)]}! ${Math.random() > 0.5 ? "Let's get started." : "Let's start."}`,
-      //   {
-      //     interruptFeedback: feedbackString,
-      //   },
-      // );
+      onSendMessage(
+        `${GREETINGS[Math.floor(Math.random() * GREETINGS.length)]}! ${Math.random() > 0.5 ? "Let's get started." : "Let's start."}`,
+        {
+          interruptFeedback: feedbackString,
+        },
+      );
     }
   }, [onSendMessage, getMapScreenshot]);
 
