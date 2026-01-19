@@ -505,26 +505,102 @@ function PlanCard({
 
   // 判断是否应该显示计划：有主要内容就显示（无论是否还在流式传输）
   const shouldShowPlan = hasMainContent;
+  // 扩展 Bounds 的辅助函数
+  const extendBounds = (
+    bounds: google.maps.LatLngBounds, 
+    fraction: number
+  ): google.maps.LatLngBounds => {
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    
+    const latDelta = (ne.lat() - sw.lat()) * fraction;
+    const lngDelta = (ne.lng() - sw.lng()) * fraction;
+
+    return new google.maps.LatLngBounds(
+      { lat: sw.lat() - latDelta, lng: sw.lng() - lngDelta },
+      { lat: ne.lat() + latDelta, lng: ne.lng() + lngDelta }
+    );
+  };
+
+  const getMapScreenshot = useCallback(async () => {
+    const selectedRegion = useStore.getState().selectedRegion;
+    
+    // 1. 基础检查
+    if (!selectedRegion || typeof window === 'undefined' || !window.google) return null;
+    const google = window.google;
+
+    try {
+      let bounds: google.maps.LatLngBounds;
+
+      // 2. 核心修复：根据你的数据结构手动创建 Bounds 实例
+      // 假设数据结构如你日志所示：{ bounds: { north, south, east, west } }
+      if (selectedRegion.bounds) {
+        const b = selectedRegion.bounds;
+        bounds = new google.maps.LatLngBounds(
+          { lat: b.south, lng: b.west }, // 西南角
+          { lat: b.north, lng: b.east }  // 东北角
+        );
+      } else {
+        console.error("Selected region does not have valid bounds data");
+        return null;
+      }
+
+      // 3. 调用扩展函数（确保 extendBounds 内部也使用了 new google.maps.LatLngBounds）
+      const paddedBounds = extendBounds(bounds, 0.15);
+      const sw = paddedBounds.getSouthWest();
+      const ne = paddedBounds.getNorthEast();
+
+      const MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+      // 4. 构建 Static Maps URL
+      const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
+      url.searchParams.append("size", "640x640");
+      url.searchParams.append("scale", "2");
+      url.searchParams.append("key", MAPS_API_KEY || "");
+      
+      // 使用 visible 参数让 Google 自动缩放
+      url.searchParams.append("visible", `${sw.lat()},${sw.lng()}|${ne.lat()},${ne.lng()}`);
+
+      // (可选) 如果你想在截图中把那个红框画出来，可以加上 path 参数
+      const b = selectedRegion.bounds;
+      const path = `color:0xff0000ff|weight:2|fillcolor:0xff000033|${b.north},${b.west}|${b.north},${b.east}|${b.south},${b.east}|${b.south},${b.west}|${b.north},${b.west}`;
+      url.searchParams.append("path", path);
+
+      return url.toString();
+    } catch (error) {
+      console.error("生成截图 URL 失败:", error);
+      return null;
+    }
+  }, []);
+
   const handleAccept = useCallback(async () => {
     const selectedRegion = useStore.getState().selectedRegion;
     if (!selectedRegion) {
       toast.warning("Please select a research area on the map using drawing tools first.");
       return;
     }
+
+    // 获取地图截图
+    const mapImageUrl = await getMapScreenshot();
+
     if (onSendMessage) {
-      const regionInfo = selectedRegion ? ` Region: ${JSON.stringify(selectedRegion)}` : "";
+      let regionInfo = selectedRegion ? ` Region: ${JSON.stringify(selectedRegion)}` : "";
+      if (mapImageUrl) {
+        regionInfo += `, MapImage: ${mapImageUrl}`;
+      }
       const feedbackString = `[ACCEPTED]${regionInfo}`;
 
       console.log("🚀 Sending Feedback to Backend:", feedbackString);
 
-      onSendMessage(
-        `${GREETINGS[Math.floor(Math.random() * GREETINGS.length)]}! ${Math.random() > 0.5 ? "Let's get started." : "Let's start."}`,
-        {
-          interruptFeedback: feedbackString,
-        },
-      );
+      // onSendMessage(
+      //   `${GREETINGS[Math.floor(Math.random() * GREETINGS.length)]}! ${Math.random() > 0.5 ? "Let's get started." : "Let's start."}`,
+      //   {
+      //     interruptFeedback: feedbackString,
+      //   },
+      // );
     }
-  }, [onSendMessage]);
+  }, [onSendMessage, getMapScreenshot]);
+
   return (
     <div className={cn("w-full", className)}>
       {reasoningContent && (

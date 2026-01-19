@@ -708,15 +708,15 @@ def coordinator_node(
                 )
 
                 # Append coordinator's question to messages
-                updated_messages = list(state_messages)
-                if response.content:
-                    updated_messages.append(
+                new_messages = []
+                if response.content and str(response.content).strip():
+                    new_messages.append(
                         AIMessage(content=response.content, name="coordinator")
                     )
 
                 return Command(
                     update={
-                        "messages": updated_messages,
+                        "messages": new_messages,
                         "locale": locale,
                         "research_topic": research_topic,
                         "resources": configurable.resources,
@@ -742,9 +742,9 @@ def coordinator_node(
     # ============================================================
     # Final: Build and return Command
     # ============================================================
-    messages = list(state.get("messages", []) or [])
-    if response.content:
-        messages.append(AIMessage(content=response.content, name="coordinator"))
+    new_messages = []
+    if response.content and str(response.content).strip():
+        new_messages.append(AIMessage(content=response.content, name="coordinator"))
 
     # Initialize location and timeframe
     location = ""
@@ -810,7 +810,7 @@ def coordinator_node(
     # clarified_research_topic: Complete clarified topic with all clarification rounds
     return Command(
         update={
-            "messages": messages,
+            "messages": new_messages,
             "locale": locale,
             "research_topic": research_topic,
             "clarified_research_topic": clarified_research_topic_value,

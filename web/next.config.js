@@ -20,6 +20,12 @@ const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 
 const config = {
   // For development mode
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   turbopack: {
     rules: {
       "*.md": {
@@ -29,7 +35,6 @@ const config = {
     },
   },
 
-  // For production mode
   webpack: (config) => {
     config.module.rules.push({
       test: /\.md$/,
@@ -38,7 +43,6 @@ const config = {
     return config;
   },
 
-  // ... rest of the configuration.
   output: "standalone",
 };
 

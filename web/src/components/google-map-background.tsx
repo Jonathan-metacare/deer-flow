@@ -146,6 +146,29 @@ export function GoogleMapBackground({ className }: { className?: string }) {
 
     // Sync map center with store query
     const mapCenterQuery = useStore((state) => state.mapCenterQuery);
+
+    // Handle ESC key to cancel selection
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                // Don't modify if research is locked/ongoing
+                if (useStore.getState().ongoingResearchId) return;
+
+                if (currentOverlayRef.current) {
+                    // Remove the shape from the map
+                    currentOverlayRef.current.setMap(null);
+                    currentOverlayRef.current = null;
+
+                    // Clear the selection in the global store
+                    useStore.getState().setSelectedRegion(null);
+                    console.log("📍 Map Region Selection Cancelled via ESC");
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
     useEffect(() => {
         if (!mapInstance.current || !mapCenterQuery || !window.google) return;
 
