@@ -204,11 +204,382 @@ ${htmlContent}
         text: { fontSize: 11, normalHeight: 5, paragraphSpacing: 2 },
         list: { bullet: "• ", indentLevel: 2 },
         emptyLine: { height: 4 },
+        image: { maxHeight: 100, spacing: 5 },
+      };
+
+      // Helper function to render text with markdown formatting (bold and links)
+      const renderFormattedText = (
+        text: string,
+        x: number,
+        startY: number,
+        maxWidth: number,
+        fontSize: number,
+        defaultBold: boolean = false
+      ): number => {
+        let currentY = startY;
+        pdf.setFontSize(fontSize);
+
+        // Pattern to match: bold (**text**), links [text](url)
+        const pattern = /(\*\*(.*?)\*\*)|(\[(.*?)\]\((.*?)\))/g;
+        const segments: Array<{ text: string; bold: boolean; link?: string }> = [];
+        let lastIndex = 0;
+        let match;
+
+        while ((match = pattern.exec(text)) !== null) {
+          // Add plain text before the match
+          if (match.index > lastIndex) {
+            segments.push({
+              text: text.slice(lastIndex, match.index),
+              bold: defaultBold,
+            });
+          }
+
+          if (match[1]) {
+            // Bold: **text**
+            segments.push({ text: match[2] ?? "", bold: true });
+          } else if (match[3]) {
+            // Link: [text](url)
+            segments.push({
+              text: match[4] ?? "",
+              bold: defaultBold,
+              link: match[5],
+            });
+          }
+
+          lastIndex = pattern.lastIndex;
+        }
+
+        // Add remaining plain text
+        if (lastIndex < text.length) {
+          segments.push({ text: text.slice(lastIndex), bold: defaultBold });
+        }
+
+        // If no patterns found, add the whole text
+        if (segments.length === 0) {
+          segments.push({ text, bold: defaultBold });
+        }
+
+        // Render segments
+        let currentLine = "";
+        let currentLineSegments: typeof segments = [];
+
+        for (const segment of segments) {
+          const words = segment.text.split(" ");
+
+          for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            const testLine = currentLine + (currentLine ? " " : "") + word;
+            const testWidth = pdf.getTextWidth(testLine);
+
+            if (testWidth > maxWidth && currentLine) {
+              // Render current line
+              let lineX = x;
+              for (const lineSeg of currentLineSegments) {
+                pdf.setFont("helvetica", lineSeg.bold ? "bold" : "normal");
+
+                if (lineSeg.link) {
+                  // Render as link (blue and underlined)
+                  pdf.setTextColor(0, 0, 255);
+                  pdf.text(lineSeg.text, lineX, currentY);
+                  const linkWidth = pdf.getTextWidth(lineSeg.text);
+                  pdf.link(lineX, currentY - 3, linkWidth, 5, { url: lineSeg.link });
+                  pdf.setTextColor(0, 0, 0);
+                  lineX += linkWidth + pdf.getTextWidth(" ");
+                } else {
+                  pdf.text(lineSeg.text, lineX, currentY);
+                  lineX += pdf.getTextWidth(lineSeg.text + " ");
+                }
+              }
+
+              currentY += fontSize * 0.45;
+              currentLine = word;
+              currentLineSegments = [{ ...segment, text: word }];
+            } else {
+              currentLine = testLine;
+              if (currentLineSegments.length > 0 && currentLineSegments[currentLineSegments.length - 1].bold === segment.bold && currentLineSegments[currentLineSegments.length - 1].link === segment.link) {
+                currentLineSegments[currentLineSegments.length - 1].text += (currentLineSegments[currentLineSegments.length - 1].text ? " " : "") + word;
+              } else {
+                currentLineSegments.push({ ...segment, text: word });
+              }
+            }
+          }
+        }
+
+        // Render last line
+        if (currentLine) {
+          let lineX = x;
+          for (const lineSeg of currentLineSegments) {
+            pdf.setFont("helvetica", lineSeg.bold ? "bold" : "normal");
+
+            if (lineSeg.link) {
+              pdf.setTextColor(0, 0, 255);
+              pdf.text(lineSeg.text, lineX, currentY);
+              const linkWidth = pdf.getTextWidth(lineSeg.text);
+              pdf.link(lineX, currentY - 3, linkWidth, 5, { url: lineSeg.link });
+              pdf.setTextColor(0, 0, 0);
+              lineX += linkWidth + pdf.getTextWidth(" ");
+            } else {
+              pdf.text(lineSeg.text, lineX, currentY);
+              lineX += pdf.getTextWidth(lineSeg.text + " ");
+            }
+          }
+          currentY += fontSize * 0.45;
+        }
+
+        return currentY;
+      };
+
+      // Helper function to load and add image to PDF
+      const addImageToPDF = async (imageUrl: string, altText: string) => {
+        try {
+          // Check if we need a new page
+          if (y + PDF_CONSTANTS.image.maxHeight > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+
+          // Fetch the image
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+
+          // Calculate image dimensions to fit within page width
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+
+          const imgAspectRatio = img.width / img.height;
+          let imgWidth = maxWidth;
+          let imgHeight = imgWidth / imgAspectRatio;
+
+          // If image is too tall, scale it down
+          if (imgHeight > PDF_CONSTANTS.image.maxHeight) {
+            imgHeight = PDF_CONSTANTS.image.maxHeight;
+            imgWidth = imgHeight * imgAspectRatio;
+          }
+
+          // Center the image horizontally
+          const xOffset = margin + (maxWidth - imgWidth) / 2;
+
+          // Add image to PDF
+          pdf.addImage(dataUrl, "PNG", xOffset, y, imgWidth, imgHeight);
+          y += imgHeight + PDF_CONSTANTS.image.spacing;
+
+          // Add alt text as caption if provided
+          if (altText) {
+            pdf.setFontSize(9);
+            pdf.setFont("helvetica", "italic");
+            const captionText = pdf.splitTextToSize(altText, maxWidth);
+            pdf.text(captionText, margin, y);
+            y += captionText.length * 4 + PDF_CONSTANTS.image.spacing;
+          }
+        } catch (error) {
+          console.error("Failed to load image:", imageUrl, error);
+          // Add a placeholder text if image fails to load
+          pdf.setFontSize(10);
+          pdf.setFont("helvetica", "italic");
+          pdf.text(`[Image: ${altText || imageUrl}]`, margin, y);
+          y += 10;
+        }
+      };
+
+      // Helper function to render table in PDF
+      const addTableToPDF = (tableLines: string[]) => {
+        try {
+          // Parse table structure
+          const rows: string[][] = [];
+
+          for (const line of tableLines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine.startsWith("|")) continue;
+
+            // Check if this is the header separator line (e.g., |---|---|)
+            if (/^\|[\s\-:|]+\|$/.exec(trimmedLine)) {
+              continue;
+            }
+
+            // Parse cells
+            const cells = trimmedLine
+              .split("|")
+              .slice(1, -1) // Remove first and last empty elements
+              .map((cell) => cell.trim());
+
+            if (cells.length > 0) {
+              rows.push(cells);
+            }
+          }
+
+          if (rows.length === 0) return;
+
+          // Calculate column widths
+          const numCols = rows[0].length;
+          const colWidth = maxWidth / numCols;
+          const cellPadding = 2;
+          const fontSize = 9;
+
+          // Helper function to process cell text with markdown formatting
+          const processCellText = (text: string): Array<{ text: string; bold: boolean }> => {
+            const parts: Array<{ text: string; bold: boolean }> = [];
+            let lastIndex = 0;
+            const boldPattern = /\*\*(.*?)\*\*/g;
+            let match;
+
+            while ((match = boldPattern.exec(text)) !== null) {
+              // Add text before bold
+              if (match.index > lastIndex) {
+                parts.push({ text: text.slice(lastIndex, match.index), bold: false });
+              }
+              // Add bold text
+              parts.push({ text: match[1] ?? "", bold: true });
+              lastIndex = boldPattern.lastIndex;
+            }
+
+            // Add remaining text
+            if (lastIndex < text.length) {
+              parts.push({ text: text.slice(lastIndex), bold: false });
+            }
+
+            return parts.length > 0 ? parts : [{ text, bold: false }];
+          };
+
+          // Calculate row heights dynamically based on content
+          const rowHeights: number[] = [];
+          pdf.setFontSize(fontSize);
+
+          for (const row of rows) {
+            if (!row) continue;
+            let maxLines = 1;
+
+            for (const cell of row) {
+              const cellText = cell
+                .replace(/\*\*(.*?)\*\*/g, "$1")
+                .replace(/\*(.*?)\*/g, "$1")
+                .replace(/`(.*?)`/g, "$1")
+                .replace(/\[(.*?)\]\(.*?\)/g, "$1");
+
+              const textLines = pdf.splitTextToSize(cellText, colWidth - 2 * cellPadding);
+              maxLines = Math.max(maxLines, textLines.length);
+            }
+
+            // Row height = number of lines * line height + padding
+            rowHeights.push(maxLines * 5 + 4);
+          }
+
+          // Check if table fits on current page
+          const tableHeight = rowHeights.reduce((sum, h) => sum + h, 0);
+          if (y + tableHeight > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+
+          // Draw table
+          let currentY = y;
+          let isHeader = true;
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowHeight = rowHeights[i];
+            if (!row || !rowHeight) continue;
+
+            // Draw row background for header
+            if (isHeader) {
+              pdf.setFillColor(240, 240, 240);
+              pdf.rect(margin, currentY, maxWidth, rowHeight, "F");
+              isHeader = false;
+            }
+
+            // Draw cell borders and text
+            for (let j = 0; j < row.length; j++) {
+              const cell = row[j];
+              if (!cell) continue;
+
+              const cellX = margin + j * colWidth;
+              const cellText = cell
+                .replace(/\*(.*?)\*/g, "$1")
+                .replace(/`(.*?)`/g, "$1")
+                .replace(/\[(.*?)\]\(.*?\)/g, "$1");
+
+              // Draw cell border
+              pdf.setDrawColor(200, 200, 200);
+              pdf.rect(cellX, currentY, colWidth, rowHeight);
+
+              // Process and draw cell text with bold support
+              const textParts = processCellText(cellText);
+              let textY = currentY + cellPadding + 3;
+
+              pdf.setFontSize(fontSize);
+
+              for (const part of textParts) {
+                pdf.setFont("helvetica", part.bold || i === 0 ? "bold" : "normal");
+                const lines = pdf.splitTextToSize(part.text, colWidth - 2 * cellPadding);
+
+                for (const line of lines) {
+                  pdf.text(line, cellX + cellPadding, textY);
+                  textY += 5;
+                }
+              }
+            }
+
+            currentY += rowHeight;
+          }
+
+          y = currentY + 5;
+        } catch (error) {
+          console.error("Failed to render table:", error);
+        }
       };
 
       const lines = report.content.split("\n");
+      let i = 0;
 
-      for (const line of lines) {
+      while (i < lines.length) {
+        const line = lines[i];
+        if (!line) {
+          i++;
+          continue;
+        }
+
+        // Check for table start (line starting with |)
+        if (line.trim().startsWith("|")) {
+          const tableLines: string[] = [];
+          let j = i;
+
+          // Collect all consecutive table lines
+          while (j < lines.length && lines[j]?.trim().startsWith("|")) {
+            const tableLine = lines[j];
+            if (tableLine) {
+              tableLines.push(tableLine);
+            }
+            j++;
+          }
+
+          if (tableLines.length > 0) {
+            addTableToPDF(tableLines);
+            i = j;
+            continue;
+          }
+        }
+
+        // Check for image syntax: ![alt text](url)
+        const imageMatch = /^!\[(.*?)\]\((.*?)\)$/.exec(line.trim());
+        if (imageMatch) {
+          const altText = imageMatch[1] ?? "";
+          const imageUrl = imageMatch[2] ?? "";
+          if (imageUrl) {
+            await addImageToPDF(imageUrl, altText);
+          }
+          i++;
+          continue;
+        }
+
         // Handle headings
         if (line.startsWith("### ")) {
           const h3 = PDF_CONSTANTS.headings.h3;
@@ -247,81 +618,95 @@ ${htmlContent}
           pdf.text(splitText, margin, y);
           y += splitText.length * h1.lineHeight + h1.spacing;
         } else if (line.startsWith("- ") || line.startsWith("* ")) {
-          // Unordered list item
+          // Unordered list item - use renderFormattedText for bold and link support
           const textConfig = PDF_CONSTANTS.text;
-          pdf.setFontSize(textConfig.fontSize);
-          pdf.setFont("helvetica", "normal");
-          const cleanText = line
-            .substring(2)
-            .replace(/\*\*(.*?)\*\*/g, "$1")
-            .replace(/\*(.*?)\*/g, "$1")
-            .replace(/`(.*?)`/g, "$1")
-            .replace(/\[(.*?)\]\(.*?\)/g, "$1");
-          const bulletText = `• ${cleanText}`;
-          const splitText = pdf.splitTextToSize(bulletText, maxWidth - 5);
 
-          if (
-            y + splitText.length * textConfig.normalHeight >
-            pageHeight - margin
-          ) {
+          // Check if we need a new page
+          if (y + 20 > pageHeight - margin) {
             pdf.addPage();
             y = margin;
           }
-          pdf.text(splitText, margin + PDF_CONSTANTS.list.indentLevel, y);
-          y +=
-            splitText.length * textConfig.normalHeight +
-            PDF_CONSTANTS.text.paragraphSpacing;
-        } else if (/^\d+\.\s/.test(line)) {
-          // Ordered list item
-          const textConfig = PDF_CONSTANTS.text;
+
+          // Remove only italic and code markdown, keep bold and links
+          const processedText = line
+            .substring(2)
+            .replace(/\*(.*?)\*/g, "$1")
+            .replace(/`(.*?)`/g, "$1");
+
+          // Render bullet
           pdf.setFontSize(textConfig.fontSize);
           pdf.setFont("helvetica", "normal");
-          const match = /^(\d+)\.\s(.*)$/.exec(line);
-          if (match?.[1] && match[2]) {
-            const cleanText = match[2]
-              .replace(/\*\*(.*?)\*\*/g, "$1")
-              .replace(/\*(.*?)\*/g, "$1")
-              .replace(/`(.*?)`/g, "$1")
-              .replace(/\[(.*?)\]\(.*?\)/g, "$1");
-            const numberedText = `${match[1]}. ${cleanText}`;
-            const splitText = pdf.splitTextToSize(numberedText, maxWidth - 5);
+          pdf.text("•", margin + PDF_CONSTANTS.list.indentLevel, y);
 
-            if (
-              y + splitText.length * textConfig.normalHeight >
-              pageHeight - margin
-            ) {
+          // Render text with formatting
+          y = renderFormattedText(
+            processedText,
+            margin + PDF_CONSTANTS.list.indentLevel + 5,
+            y,
+            maxWidth - PDF_CONSTANTS.list.indentLevel - 5,
+            textConfig.fontSize,
+            false
+          );
+          y += PDF_CONSTANTS.text.paragraphSpacing;
+        } else if (/^\d+\.\s/.test(line)) {
+          // Ordered list item - use renderFormattedText for bold and link support
+          const textConfig = PDF_CONSTANTS.text;
+          const match = /^(\d+)\.\s(.*)$/.exec(line);
+
+          if (match?.[1] && match[2]) {
+            // Check if we need a new page
+            if (y + 20 > pageHeight - margin) {
               pdf.addPage();
               y = margin;
             }
-            pdf.text(splitText, margin + PDF_CONSTANTS.list.indentLevel, y);
-            y +=
-              splitText.length * textConfig.normalHeight +
-              PDF_CONSTANTS.text.paragraphSpacing;
+
+            // Remove only italic and code markdown, keep bold and links
+            const processedText = match[2]
+              .replace(/\*(.*?)\*/g, "$1")
+              .replace(/`(.*?)`/g, "$1");
+
+            // Render number
+            pdf.setFontSize(textConfig.fontSize);
+            pdf.setFont("helvetica", "normal");
+            const numberText = `${match[1]}.`;
+            pdf.text(numberText, margin + PDF_CONSTANTS.list.indentLevel, y);
+            const numberWidth = pdf.getTextWidth(numberText);
+
+            // Render text with formatting
+            y = renderFormattedText(
+              processedText,
+              margin + PDF_CONSTANTS.list.indentLevel + numberWidth + 2,
+              y,
+              maxWidth - PDF_CONSTANTS.list.indentLevel - numberWidth - 2,
+              textConfig.fontSize,
+              false
+            );
+            y += PDF_CONSTANTS.text.paragraphSpacing;
           }
         } else if (line.trim()) {
-          // Normal text
+          // Normal text - use renderFormattedText for bold and link support
           const textConfig = PDF_CONSTANTS.text;
-          pdf.setFontSize(textConfig.fontSize);
-          pdf.setFont("helvetica", "normal");
-          // Remove markdown formatting
-          const cleanText = line
-            .replace(/\*\*(.*?)\*\*/g, "$1")
-            .replace(/\*(.*?)\*/g, "$1")
-            .replace(/`(.*?)`/g, "$1")
-            .replace(/\[(.*?)\]\(.*?\)/g, "$1");
-          const splitText = pdf.splitTextToSize(cleanText, maxWidth);
 
-          if (
-            y + splitText.length * textConfig.normalHeight >
-            pageHeight - margin
-          ) {
+          // Check if we need a new page (estimate)
+          if (y + 20 > pageHeight - margin) {
             pdf.addPage();
             y = margin;
           }
-          pdf.text(splitText, margin, y);
-          y +=
-            splitText.length * textConfig.normalHeight +
-            PDF_CONSTANTS.text.paragraphSpacing;
+
+          // Remove only italic and code markdown, keep bold and links for renderFormattedText
+          const processedText = line
+            .replace(/\*(.*?)\*/g, "$1")
+            .replace(/`(.*?)`/g, "$1");
+
+          y = renderFormattedText(
+            processedText,
+            margin,
+            y,
+            maxWidth,
+            textConfig.fontSize,
+            false
+          );
+          y += PDF_CONSTANTS.text.paragraphSpacing;
         } else {
           // Empty line
           y += PDF_CONSTANTS.emptyLine.height;
@@ -332,6 +717,8 @@ ${htmlContent}
           pdf.addPage();
           y = margin;
         }
+
+        i++;
       }
 
       pdf.save(`research-report-${getTimestamp()}.pdf`);

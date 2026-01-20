@@ -889,6 +889,26 @@ def reporter_node(state: State, config: RunnableConfig):
     invoke_messages = apply_prompt_template("reporter", input_, configurable, input_.get("locale", "en-US"))
     observations = state.get("observations", [])
 
+    # Add region map image information if available
+    region_image_url = state.get("region_image_url", "")
+    selected_region = state.get("selected_region", "")
+
+    if region_image_url:
+        logger.info(f"Adding region map image to report: {region_image_url}")
+        region_info_content = f"# User-Selected Research Region\n\nThe user has selected a specific geographic region for this research. Include the following map image at the TOP of your report (right after the title, before Key Points section):\n\n![Research Region Map]({region_image_url})\n\n"
+
+        if selected_region:
+            region_info_content += f"Region details: {selected_region}\n\n"
+
+        region_info_content += "IMPORTANT: This map image MUST appear at the very beginning of your report, immediately after the title and before the 'Key Points' section. This helps readers understand the geographic scope of the research."
+
+        invoke_messages.append(
+            HumanMessage(
+                content=region_info_content,
+                name="system",
+            )
+        )
+
     # Add a reminder about the new report format, citation style, and table usage
     invoke_messages.append(
         HumanMessage(
@@ -1014,10 +1034,40 @@ async def _execute_agent_step(
             completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
 
     # Prepare the input for the agent with completed steps info
+    # Include selected region information if available
+    selected_region = state.get("selected_region", "")
+    region_context = ""
+
+    if selected_region:
+        # Format region information for the agent
+        region_context = "\n\n## Research Region\n\n"
+        region_context += "**IMPORTANT**: The user has selected a specific geographic region for this research. "
+        region_context += "All your research, analysis, and web searches MUST focus on this specific region.\n\n"
+
+        # Extract key information from selected_region
+        if isinstance(selected_region, dict):
+            if "bounds" in selected_region:
+                bounds = selected_region["bounds"]
+                region_context += f"**Geographic Bounds**:\n"
+                region_context += f"- North: {bounds.get('north', 'N/A')}\n"
+                region_context += f"- South: {bounds.get('south', 'N/A')}\n"
+                region_context += f"- East: {bounds.get('east', 'N/A')}\n"
+                region_context += f"- West: {bounds.get('west', 'N/A')}\n\n"
+
+            if "name" in selected_region:
+                region_context += f"**Region Name**: {selected_region['name']}\n\n"
+
+            if "place_id" in selected_region:
+                region_context += f"**Place ID**: {selected_region['place_id']}\n\n"
+        else:
+            region_context += f"**Region Details**: {selected_region}\n\n"
+
+        region_context += "When conducting web searches, include geographic qualifiers (coordinates, region name, or location) in your search queries to ensure results are relevant to this specific area."
+
     agent_input = {
         "messages": [
             HumanMessage(
-                content=f"# Research Topic\n\n{plan_title}\n\n{completed_steps_info}# Current Step\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
+                content=f"# Research Topic\n\n{plan_title}\n\n{region_context}{completed_steps_info}# Current Step\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
             )
         ]
     }

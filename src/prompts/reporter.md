@@ -60,23 +60,29 @@ Structure your report in the following format:
    - Always use the first level heading for the title.
    - A concise title for the report.
 
-2. **Key Points**
+2. **Research Region Map** (if provided)
+   - If a map image URL is provided in the system messages, include it immediately after the title.
+   - Use the format: `![Research Region Map](image_url)`
+   - This map shows the user-selected geographic area for the research.
+   - DO NOT skip this section if a map image is provided.
+
+3. **Key Points**
    - A bulleted list of the most important findings (4-6 points).
    - Each point should be concise (1-2 sentences).
    - Focus on the most significant and actionable information.
 
-3. **Overview**
+4. **Overview**
    - A brief introduction to the topic (1-2 paragraphs).
    - Provide context and significance.
 
-4. **Detailed Analysis**
+5. **Detailed Analysis**
    - Organize information into logical sections with clear headings.
    - Include relevant subsections as needed.
    - Present information in a structured, easy-to-follow manner.
    - Highlight unexpected or particularly noteworthy details.
    - **Including images from the previous steps in the report is very helpful.**
 
-5. **Survey Note** (for more comprehensive reports)
+6. **Survey Note** (for more comprehensive reports)
    {% if report_style == "academic" %}
    - **Literature Review & Theoretical Framework**: Comprehensive analysis of existing research and theoretical foundations
    - **Methodology & Data Analysis**: Detailed examination of research methods and analytical approaches
@@ -132,7 +138,7 @@ Structure your report in the following format:
    - This section is optional for shorter reports.
    {% endif %}
 
-6. **Key Citations**
+7. **Key Citations**
    - List all references at the end in link reference format.
    - Include an empty line between each citation for better readability.
    - Format: `- [Source Title](URL)`
