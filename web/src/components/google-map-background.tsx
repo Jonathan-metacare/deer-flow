@@ -238,7 +238,7 @@ export function GoogleMapBackground({ className }: { className?: string }) {
                     drawingControlOptions: {
                         position: window.google.maps.ControlPosition.TOP_CENTER,
                         drawingModes: [
-                            window.google.maps.drawing.OverlayType.POLYGON,
+                            // window.google.maps.drawing.OverlayType.POLYGON,
                             window.google.maps.drawing.OverlayType.RECTANGLE,
                         ],
                     },

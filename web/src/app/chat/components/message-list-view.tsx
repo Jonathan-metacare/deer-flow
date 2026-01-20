@@ -584,10 +584,14 @@ function PlanCard({
     const mapImageUrl = await getMapScreenshot();
 
     if (onSendMessage) {
-      let regionInfo = selectedRegion ? ` Region: ${JSON.stringify(selectedRegion)}` : "";
-      if (mapImageUrl) {
-        regionInfo += `, MapImage: ${mapImageUrl}`;
-      }
+      // Create a proper JSON object with region data
+      const regionData = {
+        region: selectedRegion ? JSON.stringify(selectedRegion) : null,
+        mapImage: mapImageUrl || null
+      };
+      
+      // Convert to a JSON string
+      const regionInfo = JSON.stringify(regionData);
       const feedbackString = `[ACCEPTED]${regionInfo}`;
 
       console.log("🚀 Sending Feedback to Backend:", feedbackString);

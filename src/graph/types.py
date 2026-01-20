@@ -41,5 +41,8 @@ class State(MessagesState):
         3  # Default: 3 rounds (only used when enable_clarification=True)
     )
 
+    # Region selection
+    selected_region: str = ""
+    region_image_url: str = ""
     # Workflow control
     goto: str = "planner"  # Default next node

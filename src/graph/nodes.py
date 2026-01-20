@@ -121,6 +121,8 @@ def preserve_state_meta_fields(state: State) -> dict:
         "resources": state.get("resources", []),
         "location": state.get("location", ""),
         "timeframe": state.get("timeframe", ""),
+        "selected_region": state.get("selected_region", ""),
+        "region_image_url": state.get("region_image_url", ""),
     }
 
 
@@ -447,6 +449,11 @@ def human_feedback_node(
     current_plan = state.get("current_plan", "")
     # check if the plan is auto accepted
     auto_accepted_plan = state.get("auto_accepted_plan", False)
+
+    # Initialize variables to store parsed region data from feedback
+    parsed_region = state.get("selected_region", "")
+    parsed_map_image = state.get("region_image_url", "")
+
     if not auto_accepted_plan:
         feedback = interrupt("Please Review the Plan.")
 
@@ -477,6 +484,40 @@ def human_feedback_node(
             )
         elif feedback_check.startswith("ACCEPTED"):
             logger.info("Plan is accepted by user.")
+            # Parse JSON data from the feedback if present
+            # Initialize variables to store parsed region data
+            parsed_region = None
+            parsed_map_image = None
+
+            try:
+                # Extract the JSON part from the feedback string
+                # Looking for pattern like: [ACCEPTED]{"region": "...", "mapImage": "..."}
+                # Note: There might be a space after [ACCEPTED], so we handle both cases
+
+                # First, try to find the JSON object directly
+                start_idx = feedback.find('{')
+                end_idx = feedback.rfind('}')
+
+                if start_idx != -1 and end_idx != -1:
+                    json_str = feedback[start_idx:end_idx+1]
+                    logger.info(f"Extracted JSON string from feedback: {json_str}")
+                    region_data = json.loads(json_str)
+
+                    # Store in variables for later use in Command update
+                    if "region" in region_data and region_data["region"]:
+                        # Parse the nested region JSON string
+                        parsed_region = json.loads(region_data["region"]) if isinstance(region_data["region"], str) else region_data["region"]
+                        logger.info(f"Parsed selected region from feedback: {parsed_region}")
+
+                    if "mapImage" in region_data and region_data["mapImage"]:
+                        parsed_map_image = region_data["mapImage"]
+                        logger.info(f"Parsed map image URL from feedback: {parsed_map_image}")
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"Could not parse JSON from feedback: {e}")
+                logger.debug(f"Feedback content that failed parsing: {feedback}")
+            except Exception as e:
+                logger.error(f"Error processing feedback JSON: {e}")
         else:
             logger.warning(f"Unsupported feedback format: {feedback}. Normalized: {feedback_normalized}. Please use '[ACCEPTED]' to accept or '[EDIT_PLAN]' to edit.")
             return Command(
@@ -525,7 +566,13 @@ def human_feedback_node(
         "plan_iterations": plan_iterations,
         **preserve_state_meta_fields(state),
     }
-    
+
+    # Add parsed region data to update dict if available
+    if parsed_region:
+        update_dict["selected_region"] = parsed_region
+    if parsed_map_image:
+        update_dict["region_image_url"] = parsed_map_image
+
     # Only override locale if new_plan provides a valid value, otherwise use preserved locale
     if new_plan.get("locale"):
         update_dict["locale"] = new_plan["locale"]
@@ -870,8 +917,10 @@ def reporter_node(state: State, config: RunnableConfig):
     response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
     response_content = response.content
     logger.info(f"reporter response: {response_content}")
-
-    return {"final_report": response_content}
+    return {
+        "final_report": response_content,
+        **preserve_state_meta_fields(state),
+    }
 
 
 def research_team_node(state: State):
